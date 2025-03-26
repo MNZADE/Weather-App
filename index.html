@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather & Air Quality App</title>
+    <style>
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            background: linear-gradient(270deg, #00c6ff, #0072ff);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            box-shadow: 0px 0px 20px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .container:hover { transform: scale(1.05); }
+
+        input, button {
+            width: 80%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 20px;
+            border: none;
+            outline: none;
+            text-align: center;
+            font-size: 16px;
+            transition: all 0.3s ease-in-out;
+        }
+
+        button {
+            background: #ff9800;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        button:hover { background: #ff5722; transform: scale(1.1); }
+
+        #weatherInfo, #forecast, #airQuality {
+            font-size: 18px;
+            margin-top: 10px;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.5s ease-in-out;
+        }
+
+        img { width: 80px; margin-top: 10px; opacity: 0; transition: all 0.5s; }
+
+        .fade-in { opacity: 1 !important; transform: translateY(0) !important; }
+
+        .forecast-item, .air-quality-box {
+            background: rgba(255, 255, 255, 0.1);
+            margin: 10px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌤 Weather & Air Quality App</h1>
+        <button onclick="getLocation()">📍 Use My Location</button>
+        <br>
+        <input type="text" id="city" placeholder="Enter city name">
+        <button onclick="getWeather()">Get Weather</button>
+        <h2 id="weatherInfo"></h2>
+        <img id="weatherIcon" style="display:none;">
+        <h3>5-Day Forecast</h3>
+        <div id="forecast"></div>
+        <h3>Air Quality Index (AQI)</h3>
+        <div id="airQuality"></div>
+    </div>
+
+    <script>
+        const apiKey = "83b86e118f7a98f577815c8a5f3a81f2"; // Replace with OpenWeather API Key
+
+        // ✅ Auto-detect user location and fetch weather
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        console.log("Detected Location:", latitude, longitude);
+
+                        // Get weather for detected location
+                        getWeatherByCoords(latitude, longitude);
+                    },
+                    (error) => {
+                        alert("Location access denied. Please enter your city manually.");
+                    }
+                );
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        }
+
+        // ✅ Fetch weather by coordinates
+        async function getWeatherByCoords(lat, lon) {
+            const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                document.getElementById("weatherInfo").innerHTML = 
+                    `${data.name}: ${data.main.temp}°C, ${data.weather[0].description}`;
+                document.getElementById("weatherInfo").classList.add("fade-in");
+
+                const icon = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
+                document.getElementById("weatherIcon").src = icon;
+                document.getElementById("weatherIcon").style.display = "block";
+                document.getElementById("weatherIcon").classList.add("fade-in");
+
+                getForecast(lat, lon);
+                getAirQuality(lat, lon);
+
+            } catch (error) {
+                console.error("Error fetching weather:", error);
+            }
+        }
+
+        // ✅ Fetch weather by city name
+        async function getWeather() {
+            const city = document.getElementById("city").value;
+            if (!city) return alert("Please enter a city!");
+
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.cod === "404") {
+                    alert("City not found!");
+                    return;
+                }
+
+                getWeatherByCoords(data.coord.lat, data.coord.lon);
+
+            } catch (error) {
+                console.error("Error fetching weather:", error);
+            }
+        }
+
+        // ✅ Fetch 5-day weather forecast
+        async function getForecast(lat, lon) {
+            const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                let forecastHTML = "";
+                for (let i = 0; i < data.list.length; i += 8) {
+                    const day = data.list[i];
+                    forecastHTML += `
+                        <div class="forecast-item">
+                            <p><strong>${new Date(day.dt * 1000).toDateString()}</strong></p>
+                            <p>${day.main.temp}°C, ${day.weather[0].description}</p>
+                            <img src="https://openweathermap.org/img/wn/${day.weather[0].icon}.png">
+                        </div>`;
+                }
+
+                document.getElementById("forecast").innerHTML = forecastHTML;
+                document.getElementById("forecast").classList.add("fade-in");
+
+            } catch (error) {
+                console.error("Error fetching forecast:", error);
+            }
+        }
+
+        // ✅ Fetch Air Quality Index (AQI)
+        async function getAirQuality(lat, lon) {
+            const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const aqi = data.list[0].main.aqi;
+                const pm25 = data.list[0].components.pm2_5;
+                const pm10 = data.list[0].components.pm10;
+                const co = data.list[0].components.co;
+                const no2 = data.list[0].components.no2;
+                
+                document.getElementById("airQuality").innerHTML = `
+                    <div class="air-quality-box">
+                        <p><strong>AQI Level:</strong> ${aqi}</p>
+                        <p>PM2.5: ${pm25} µg/m³, PM10: ${pm10} µg/m³</p>
+                        <p>CO: ${co} µg/m³, NO₂: ${no2} µg/m³</p>
+                    </div>`;
+                document.getElementById("airQuality").classList.add("fade-in");
+
+            } catch (error) {
+                console.error("Error fetching air quality:", error);
+            }
+        }
+    </script>
+</body>
+</html>
